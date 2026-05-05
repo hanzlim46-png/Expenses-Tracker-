@@ -138,7 +138,7 @@ AOS.init();
 </script>
 """, unsafe_allow_html=True)
 
-# ---------------- DATABASE ----------------
+# ---------------- DATABASE ---------------
 conn = sqlite3.connect("expenses.db", check_same_thread=False)
 cursor = conn.cursor()
 
