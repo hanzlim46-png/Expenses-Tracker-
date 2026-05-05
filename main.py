@@ -427,8 +427,8 @@ else:
 
             cols[0].write(i)
             cols[1].write(row["date"])
-            cols[2].write(row["item"])
-            cols[3].write(row["category"])
+            cols[2].write(row["category"])
+            cols[3].write(row["item"])
             cols[4].write(f"₱ {row['amount']:.2f}")
 
             if cols[5].button("✏️", key=f"edit{row['id']}"):
