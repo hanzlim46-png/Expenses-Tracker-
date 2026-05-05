@@ -7,11 +7,11 @@ import matplotlib.pyplot as plt
 import base64
 
 # ---------------- PAGE CONFIG ----------------
-st.set_page_config(page_title="Expense Tracker", page_icon="💰", layout="wide")
+st.set_page_config(page_title="CashFlow", page_icon="💰", layout="wide")
 
 # ---------------- BACKGROUND + ANIMATIONS ----------------
-def set_background(image_file):
-    with open(image_file, "rb") as img:
+def set_background(background):
+    with open(background, "rb") as img:
         encoded = base64.b64encode(img.read()).decode()
 
     st.markdown(f"""
@@ -73,9 +73,9 @@ def set_background(image_file):
 
     /* SELECT */
     div[data-baseweb="select"] > div {{
-        background-color: rgba(255,255,255,0.95) !important;
         color: black !important;
     }}
+    
 
     /* DATE INPUT */
     div[data-testid="stDateInput"] input {{
@@ -169,6 +169,15 @@ CREATE TABLE IF NOT EXISTS income (
     amount REAL
 )
 """)
+
+# ✅ ADDED LIMIT TABLE
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS limits (
+    username TEXT PRIMARY KEY,
+    amount REAL
+)
+""")
+
 conn.commit()
 
 # ---------------- SECURITY ----------------
@@ -217,6 +226,15 @@ def update_expense(expense_id, user, date, item, category, amount):
     )
     conn.commit()
 
+# ✅ LIMIT FUNCTIONS
+def set_limit(user, amount):
+    cursor.execute("REPLACE INTO limits (username, amount) VALUES (?, ?)", (user, amount))
+    conn.commit()
+
+def get_limit(user):
+    result = cursor.execute("SELECT amount FROM limits WHERE username=?", (user,)).fetchone()
+    return result[0] if result else None
+
 # ---------------- SESSION ----------------
 if "user" not in st.session_state:
     st.session_state.user = None
@@ -224,7 +242,7 @@ if "user" not in st.session_state:
 # ---------------- LOGIN ----------------
 if not st.session_state.user:
     st.markdown('<div data-aos="fade-down">', unsafe_allow_html=True)
-    st.title("💰 Expense Tracker")
+    st.title("💰 CashFlow")
     st.markdown('</div>', unsafe_allow_html=True)
 
     username = st.text_input("Username")
@@ -257,12 +275,12 @@ if not st.session_state.user:
 # ---------------- MAIN APP ----------------
 else:
     with st.sidebar:
-        st.title("💰 Expense Tracker")
+        st.title("  CashFlow")
         st.write(f"Logged in as {st.session_state.user}")
 
         menu = st.radio(
             "Menu",
-            ["🏠 Home", "➕ Add Transaction", "📋 View Expenses", "📊 Analytics"]
+            ["🏠 Home", "➕ Add Transaction", "📋 Transactions", "📊 Expenses Analytics"]
         )
 
         st.markdown("---")
@@ -289,6 +307,42 @@ else:
         col2.metric("💸 Expenses", f"₱{total_expenses:.2f}")
         col3.metric("📊 Balance", f"₱{balance:.2f}")
 
+        st.subheader("💵 Income Overview")
+
+        col1, col2 = st.columns(2)
+
+        if not income_df.empty:
+            income_df["date"] = pd.to_datetime(income_df["date"])
+            income_df["month"] = income_df["date"].dt.to_period("M").astype(str)
+
+            # 📈 LEFT - LINE CHART
+            with col1:
+                st.write("Income Trend")
+                chart_data = income_df.groupby("month")["amount"].sum().reset_index()
+                chart_data = chart_data.set_index("month")
+
+                if not income_df.empty:
+                    income_df["date"] = pd.to_datetime(income_df["date"])
+                    income_df["month"] = income_df["date"].dt.to_period("M").astype(str)
+
+                    chart_data = income_df.groupby("month")["amount"].sum().reset_index()
+
+                    st.dataframe(chart_data, use_container_width=True)
+                else:
+                    st.info("No income data yet.")
+
+            # 🥧 RIGHT - PIE CHART
+            with col2:
+                st.write("Income Distribution")
+                pie_data = income_df.groupby("source")["amount"].sum()
+
+                fig, ax = plt.subplots()
+                ax.pie(pie_data, labels=pie_data.index, autopct='%1.1f%%')
+                st.pyplot(fig)
+
+        else:
+            st.info("No income data yet.")
+
     # ---------------- ADD ----------------
     elif menu == "➕ Add Transaction":
         st.header("Add Transaction")
@@ -298,17 +352,40 @@ else:
         col1, col2 = st.columns(2)
 
         with col1:
+            if trans_type == "Expense":
+                category = st.text_input("Category")
+                item = st.text_input("Item")
+
             amount = st.number_input("Amount", min_value=0.0)
             date = st.date_input("Date", datetime.now())
 
         with col2:
-            if trans_type == "Expense":
-                category = st.text_input("Category")
-                item = st.text_input("Item")
-            else:
+            if trans_type == "Income":
                 source = st.text_input("Income Source")
 
+        # ✅ LIMIT UI (ADDED ONLY)
+        st.markdown("### 💳 Set Expense Limit")
+        limit_value = st.number_input("Set Limit", min_value=0.0, key="limit_input")
+
+        if st.button("Save Limit"):
+            set_limit(st.session_state.user, limit_value)
+            st.success("Limit Saved!")
+
+            current_limit = get_limit(st.session_state.user)
+            if current_limit is not None:
+                st.info(f"💳 Current Limit: ₱{current_limit:.2f}")
+
         if st.button("Add", use_container_width=True):
+
+            # ✅ LIMIT CHECK (ADDED ONLY)
+            user_limit = get_limit(st.session_state.user)
+            current_expenses = get_expenses(st.session_state.user)["amount"].sum()
+
+            if trans_type == "Expense":
+                if user_limit is not None and (current_expenses + amount) > user_limit:
+                    st.error("⚠️ Limit reached! Cannot add more expenses.")
+                    st.stop()
+
             if trans_type == "Expense" and category and item:
                 add_expense(st.session_state.user, str(date), item, category, amount)
                 st.success("Expense Added!")
@@ -318,7 +395,7 @@ else:
                 st.success("Income Added!")
 
     # ---------------- VIEW ----------------
-    elif menu == "📋 View Expenses":
+    elif menu == "📋 Transactions":
         st.header("Your Expenses")
 
         df = get_expenses(st.session_state.user)
@@ -327,7 +404,23 @@ else:
             st.info("No expenses yet.")
             st.stop()
 
-        st.metric("Total Spent", f"₱{df['amount'].sum():.2f}")
+        col1, col2 = st.columns(2)
+
+        total_spent = df["amount"].sum()
+        col1.metric("Total Spent", f"₱{total_spent:.2f}")
+
+        current_limit = get_limit(st.session_state.user)
+        if current_limit is not None:
+            col2.metric("💳 Budget Limit", f"₱{current_limit:.2f}")
+        else:
+            col2.metric("💳 Budget Limit", "Not set")
+
+        header = st.columns([1, 2, 2, 2, 2, 1, 1])
+        header[0].write("No.")
+        header[1].write("Date")
+        header[2].write("Category")
+        header[3].write("Item")
+        header[4].write("Amount")
 
         for i, (_, row) in enumerate(df.iterrows(), start=1):
             cols = st.columns([1,2,2,2,2,1,1])
@@ -355,7 +448,7 @@ else:
                 st.rerun()
 
     # ---------------- ANALYTICS ----------------
-    elif menu == "📊 Analytics":
+    elif menu == "📊 Expenses Analytics":
         st.header("Analytics")
 
         df = get_expenses(st.session_state.user)
@@ -382,4 +475,4 @@ else:
             st.line_chart(df.groupby("month")["amount"].sum())
 
         else:
-            st.info("No data yet.")
+            st.info ("No data yet.")
