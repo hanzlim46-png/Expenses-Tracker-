@@ -438,7 +438,7 @@ else:
                     new_category = st.text_input("Category", row["category"])
                     new_amount = st.number_input("Amount", value=row["amount"])
 
-                    if st.form_submit_button("Save"):
+                   if st.form_submit_button("Save"):
     update_expense(
         row["id"],
         st.session_state.user,
