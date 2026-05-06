@@ -390,7 +390,17 @@ else:
 
         if st.button("Add", use_container_width=True):
 
-            # ✅ LIMIT CHECK (ADDED ONLY)
+            if trans_type == "Expense":
+                if not category or not item:
+                    st.warning("Please fill category and item")
+                    st.stop()
+
+            if trans_type == "Income":
+                if not source:
+                    st.warning("Please enter income source")
+                    st.stop()
+
+            # LIMIT CHECK
             user_limit = get_limit(st.session_state.user)
             current_expenses = get_expenses(st.session_state.user)["amount"].sum()
 
@@ -399,11 +409,12 @@ else:
                     st.error("⚠️ Limit reached! Cannot add more expenses.")
                     st.stop()
 
-            if trans_type == "Expense" and category and item:
+            # SAVE DATA
+            if trans_type == "Expense":
                 add_expense(st.session_state.user, str(date), item, category, amount)
                 st.success("Expense Added!")
 
-            elif trans_type == "Income" and source:
+            else:
                 add_income(st.session_state.user, str(date), source, amount)
                 st.success("Income Added!")
 
@@ -428,15 +439,15 @@ else:
         else:
             col2.metric("💳 Budget Limit", "Not set")
 
-        header = st.columns([1, 2, 2, 2, 2, 1, 1])
+        header = st.columns([1, 2, 2, 2, 2, 1])
         header[0].write("No.")
         header[1].write("Date")
         header[2].write("Category")
-        header[3].write("Item")
+        header[3].write("item")
         header[4].write("Amount")
 
         for i, (_, row) in enumerate(df.iterrows(), start=1):
-            cols = st.columns([1, 2, 2, 2, 2, 1, 1])
+            cols = st.columns([1,2,2,2,2,1])
 
             cols[0].write(i)
             cols[1].write(row["date"])
@@ -444,19 +455,7 @@ else:
             cols[3].write(row["item"])
             cols[4].write(f"₱ {row['amount']:.2f}")
 
-            if cols[5].button("✏️", key=f"edit{row['id']}"):
-                with st.form(f"edit_form_{row['id']}"):
-                    new_date = st.date_input("Date", pd.to_datetime(row["date"]))
-                    new_item = st.text_input("Item", row["item"])
-                    new_category = st.text_input("Category", row["category"])
-                    new_amount = st.number_input("Amount", value=row["amount"])
-
-                    if st.form_submit_button("Save"):
-                        update_expense(row["id"], st.session_state.user, str(new_date), new_item, new_category,
-                                       new_amount)
-                        st.success("Updated!")
-
-            if cols[6].button("🗑️", key=f"del{row['id']}"):
+            if cols[5].button("🗑️", key=f"del{row['id']}"):
                 delete_expense(row["id"], st.session_state.user)
                 st.success("Deleted!")
                 st.rerun()
