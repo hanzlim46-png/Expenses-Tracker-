@@ -390,22 +390,36 @@ else:
 
         if st.button("Add", use_container_width=True):
 
-            # ✅ LIMIT CHECK (ADDED ONLY)
             user_limit = get_limit(st.session_state.user)
-            current_expenses = get_expenses(st.session_state.user)["amount"].sum()
 
+            # 👉 ADD THIS BLOCK HERE (your code goes HERE)
+            df = get_expenses(st.session_state.user)
+
+            if not df.empty:
+                df["date"] = pd.to_datetime(df["date"])
+                current_month = datetime.now().strftime("%Y-%m")
+                df["month"] = df["date"].dt.strftime("%Y-%m")
+
+                current_expenses = df[df["month"] == current_month]["amount"].sum()
+            else:
+                current_expenses = 0
+
+            # 👉 LIMIT CHECK (keep this AFTER computing expenses)
             if trans_type == "Expense":
                 if user_limit is not None and (current_expenses + amount) > user_limit:
-                    st.error("⚠️ Limit reached! Cannot add more expenses.")
+                    st.error("⚠️ Monthly limit reached!")
                     st.stop()
 
+            # 👉 ADD THIS (your original add logic)
             if trans_type == "Expense" and category and item:
                 add_expense(st.session_state.user, str(date), item, category, amount)
                 st.success("Expense Added!")
+                st.rerun()
 
             elif trans_type == "Income" and source:
                 add_income(st.session_state.user, str(date), source, amount)
                 st.success("Income Added!")
+                st.rerun()
 
     # ---------------- VIEW ----------------
     elif menu == "📋 Transactions":
@@ -447,7 +461,7 @@ else:
             if cols[5].button("✏️", key=f"edit{row['id']}"):
                 with st.form(f"edit_form_{row['id']}"):
                     new_date = st.date_input("Date", pd.to_datetime(row["date"]))
-                    new_item = st.text_input("Item", row["item"])
+                    new_item = st.text_input("Item", row["item"]    )
                     new_category = st.text_input("Category", row["category"])
                     new_amount = st.number_input("Amount", value=row["amount"])
 
