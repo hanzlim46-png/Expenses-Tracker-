@@ -9,6 +9,7 @@ import base64
 # ---------------- PAGE CONFIG ----------------
 st.set_page_config(page_title="CashFlow", page_icon="💰", layout="wide")
 
+
 # ---------------- BACKGROUND + ANIMATIONS ----------------
 def set_background(background):
     with open(background, "rb") as img:
@@ -75,7 +76,7 @@ def set_background(background):
     div[data-baseweb="select"] > div {{
         color: black !important;
     }}
-    
+
 
     /* DATE INPUT */
     div[data-testid="stDateInput"] input {{
@@ -125,6 +126,7 @@ def set_background(background):
 
     </style>
     """, unsafe_allow_html=True)
+
 
 # APPLY BACKGROUND
 set_background("background.png")
@@ -180,6 +182,7 @@ CREATE TABLE IF NOT EXISTS limits (
 
 conn.commit()
 
+
 # ---------------- SECURITY ----------------
 def hash_password(password, salt=None):
     if not salt:
@@ -187,12 +190,14 @@ def hash_password(password, salt=None):
     pwdhash = hashlib.pbkdf2_hmac('sha256', password.encode(), salt, 100000)
     return binascii.hexlify(salt + pwdhash).decode()
 
+
 def verify_password(stored_password, provided_password):
     data = binascii.unhexlify(stored_password.encode())
     salt = data[:16]
     stored_hash = data[16:]
     pwdhash = hashlib.pbkdf2_hmac('sha256', provided_password.encode(), salt, 100000)
     return pwdhash == stored_hash
+
 
 # ---------------- FUNCTIONS ----------------
 def add_expense(user, date, item, category, amount):
@@ -202,6 +207,7 @@ def add_expense(user, date, item, category, amount):
     )
     conn.commit()
 
+
 def add_income(user, date, source, amount):
     cursor.execute(
         "INSERT INTO income (username, date, source, amount) VALUES (?, ?, ?, ?)",
@@ -209,15 +215,19 @@ def add_income(user, date, source, amount):
     )
     conn.commit()
 
+
 def get_expenses(user):
     return pd.read_sql("SELECT * FROM expenses WHERE username=?", conn, params=(user,))
+
 
 def get_income(user):
     return pd.read_sql("SELECT * FROM income WHERE username=?", conn, params=(user,))
 
+
 def delete_expense(expense_id, user):
     cursor.execute("DELETE FROM expenses WHERE id=? AND username=?", (expense_id, user))
     conn.commit()
+
 
 def update_expense(expense_id, user, date, item, category, amount):
     cursor.execute(
@@ -226,14 +236,17 @@ def update_expense(expense_id, user, date, item, category, amount):
     )
     conn.commit()
 
+
 # ✅ LIMIT FUNCTIONS
 def set_limit(user, amount):
     cursor.execute("REPLACE INTO limits (username, amount) VALUES (?, ?)", (user, amount))
     conn.commit()
 
+
 def get_limit(user):
     result = cursor.execute("SELECT amount FROM limits WHERE username=?", (user,)).fetchone()
     return result[0] if result else None
+
 
 # ---------------- SESSION ----------------
 if "user" not in st.session_state:
@@ -396,10 +409,6 @@ else:
 
     # ---------------- VIEW ----------------
     elif menu == "📋 Transactions":
-
-        if "edit_id" not in st.session_state:
-            st.session_state.edit_id = None
-
         st.header("Your Expenses")
 
         df = get_expenses(st.session_state.user)
@@ -427,7 +436,6 @@ else:
         header[4].write("Amount")
 
         for i, (_, row) in enumerate(df.iterrows(), start=1):
-
             cols = st.columns([1, 2, 2, 2, 2, 1, 1])
 
             cols[0].write(i)
@@ -436,44 +444,24 @@ else:
             cols[3].write(row["item"])
             cols[4].write(f"₱ {row['amount']:.2f}")
 
-            # ✅ EDIT BUTTON
             if cols[5].button("✏️", key=f"edit{row['id']}"):
-                st.session_state.edit_id = row["id"]
+                with st.form(f"edit_form_{row['id']}"):
+                    new_date = st.date_input("Date", pd.to_datetime(row["date"]))
+                    new_item = st.text_input("Item", row["item"])
+                    new_category = st.text_input("Category", row["category"])
+                    new_amount = st.number_input("Amount", value=row["amount"])
 
-            # ✅ SHOW EDIT FORM
-            if st.session_state.get("edit_id") == row["id"]:
-                st.markdown("---")
-                st.subheader("Edit Expense")
-
-                new_date = st.date_input("Date", pd.to_datetime(row["date"]), key=f"date_{row['id']}")
-                new_item = st.text_input("Item", row["item"], key=f"item_{row['id']}")
-                new_category = st.text_input("Category", row["category"], key=f"cat_{row['id']}")
-                new_amount = st.number_input("Amount", value=float(row["amount"]), key=f"amt_{row['id']}")
-
-                colA, colB = st.columns(2)
-
-                if colA.button("💾 Save", key=f"save_{row['id']}"):
-                    update_expense(
-                        row["id"],
-                        st.session_state.user,
-                        str(new_date),
-                        new_item,
-                        new_category,
-                        new_amount
-                    )
-                    st.success("Updated!")
-                    st.session_state.edit_id = None
-                    st.rerun()
-
-                if colB.button("❌ Cancel", key=f"cancel_{row['id']}"):
-                    st.session_state.edit_id = None
-                    st.rerun()
-
-            # ✅ DELETE BUTTON
-            if cols[6].button("🗑️", key=f"del{row['id']}"):
-                delete_expense(row["id"], st.session_state.user)
-                st.success("Deleted!")
-                st.rerun()
+                    if st.form_submit_button("Save"):
+                        update_expense(
+                            row["id"],
+                            st.session_state.user,
+                            str(new_date),
+                            new_item,
+                            new_category,
+                            new_amount
+                        )
+                        st.success("Updated!")
+                        st.rerun()  # 🔥 force refresh so changes appear
 
             if cols[6].button("🗑️", key=f"del{row['id']}"):
                 delete_expense(row["id"], st.session_state.user)
@@ -508,4 +496,4 @@ else:
             st.line_chart(df.groupby("month")["amount"].sum())
 
         else:
-            st.info ("No data yet.")
+            st.info("No data yet.")
