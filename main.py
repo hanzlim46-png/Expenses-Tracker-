@@ -437,26 +437,27 @@ else:
 
             if cols[5].button("✏️", key=f"edit{row['id']}"):
                 if st.session_state.edit_id == row["id"]:
-                    with st.form(f"edit_form_{row['id']}"):
+                    if st.session_state.edit_id == row["id"]:
+                        with st.form(f"edit_form_{row['id']}"):
 
-                        new_date = st.date_input("Date", pd.to_datetime(row["date"]))
-                        new_item = st.text_input("Item", row["item"])
-                        new_category = st.text_input("Category", row["category"])
-                        new_amount = st.number_input("Amount", value=row["amount"])
+                            new_date = st.date_input("Date", pd.to_datetime(row["date"]))
+                            new_item = st.text_input("Item", row["item"])
+                            new_category = st.text_input("Category", row["category"])
+                            new_amount = st.number_input("Amount", value=row["amount"])
 
-                        if st.form_submit_button("Save"):
-                            update_expense(
-                                row["id"],
-                                st.session_state.user,
-                                str(new_date),
-                                new_item,
-                                new_category,
-                                new_amount
-                            )
-                            st.success("Updated!")
+                            if st.form_submit_button("Save"):
+                                update_expense(
+                                    row["id"],
+                                    st.session_state.user,
+                                    str(new_date),
+                                    new_item,
+                                    new_category,
+                                    new_amount
+                                )
+                                st.success("Updated!")
 
-                            st.session_state.edit_id = None
-                            st.rerun()
+                                st.session_state.edit_id = None
+                                st.rerun()
 
             if cols[6].button("🗑️", key=f"del{row['id']}"):
                 delete_expense(row["id"], st.session_state.user)
