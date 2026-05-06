@@ -376,7 +376,7 @@ else:
             if trans_type == "Income":
                 source = st.text_input("Income Source")
 
-        # ✅ LIMIT UI (ADDED ONLY)
+        # ✅ LIMIT UI
         st.markdown("### 💳 Set Expense Limit")
         limit_value = st.number_input("Set Limit", min_value=0.0, key="limit_input")
 
